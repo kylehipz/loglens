@@ -1,5 +1,8 @@
 .PHONY: run clean
 
+FILE ?= big-1.log
+LINE_COUNT ?= 10000
+
 run: bin/loglens
 	@./bin/loglens
 
@@ -12,3 +15,6 @@ clean:
 	@echo "Removing loglens binary..."
 	@rm -rf bin/*
 	@echo "Loglens binary removed!"
+
+gen-logs:
+	@python3 gen_logs.py $(LINE_COUNT) > data/$(FILE)

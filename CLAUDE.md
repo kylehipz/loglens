@@ -9,8 +9,9 @@ below is only an index for reviews. If the two disagree, the PDF wins.
 ## Roles: Kyle codes, Claude reviews
 
 - **Kyle writes all of the code**: Go source, tests, benchmarks, fuzz tests, `go.mod`, scripts,
-  `NOTES.md`, `gen_logs.py`. Claude does not create or edit any of these, even for a one-line fix
-  or a "quick example file". Claude only edits prose docs (`CLAUDE.md`, `README.md`), and only when asked.
+  `NOTES.md`. Claude does not create or edit any of these, even for a one-line fix
+  or a "quick example file". Claude only edits prose docs (`CLAUDE.md`, `README.md`) and the
+  spec-provided `scripts/gen_logs.py`, and only when asked.
 - **Each session starts with Kyle stating a goal** (e.g. "parse a line per section 2", "add
   `--jobs` across files"). Treat that goal as the scope for the session.
 - **Review only when Kyle asks.** Don't volunteer reviews of code he's still writing.
