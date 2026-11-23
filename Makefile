@@ -1,20 +1,24 @@
-.PHONY: run clean
+.PHONY: run clean gen-logs build
 
-FILE ?= big-1.log
-LINE_COUNT ?= 10000
+FILE ?= sample.log
+LINE_COUNT ?= 100
 
-run: bin/loglens
+run: build
 	@./bin/loglens
 
-bin/loglens: $(shell find . -name '*.go') go.mod
+build:
 	@echo "Building loglens binary...."
-	@go build -o bin/loglens cmd/loglens/main.go
+	@go build -o bin/loglens ./cmd/loglens/
 	@echo "Build finished! Loglens binary at bin/loglens"
 
 clean:
 	@echo "Removing loglens binary..."
 	@rm -rf bin/*
 	@echo "Loglens binary removed!"
+	@echo "Removing generated logs..."
+	@rm -rf data/*
+	@echo "Generated logs removed!"
 
 gen-logs:
-	@python3 gen_logs.py $(LINE_COUNT) > data/$(FILE)
+	@mkdir -p data
+	@python3 scripts/gen_logs.py $(LINE_COUNT) > data/$(FILE)

@@ -4,8 +4,9 @@ A command-line tool, written in Go, that analyzes access logs and reports traffi
 latency. It has a batch mode for one or more files and a follow mode for a single growing log.
 
 > **Status:** work in progress. This is a learning project for Go; the behavior below is what the
-> tool is being built to do, as specified in [`loglens-srs.pdf`](loglens-srs.pdf) (SRS v4.0).
-> Requirement IDs like FR-7 and NFR-4 refer to that document.
+> tool is being built to do, as specified in a software requirements specification (SRS v4.0)
+> that is kept out of this repository. Requirement IDs like FR-7 and NFR-4 refer to that
+> document.
 
 ## Usage
 
@@ -140,7 +141,8 @@ gofmt -l . && go vet ./... && staticcheck ./... && revive ./...   # static check
 
 ### Test data
 
-Test logs come from `gen_logs.py` (SRS Appendix A); about 1% of generated lines are malformed.
+Test logs come from `scripts/gen_logs.py` (from SRS Appendix A); about 1% of generated lines
+are malformed.
 
 ```sh
 python3 scripts/gen_logs.py 20000 > data/access.log                                     # D1
@@ -160,9 +162,8 @@ Measurements are recorded in `NOTES.md`.
 ## Layout
 
 ```
-cmd/loglens/      the loglens binary (kept thin)
-internal/         parsing, statistics, reporting, follow mode
-scripts/          gen_logs.py
-data/             generated test logs (not committed)
-loglens-srs.pdf   requirements
+cmd/loglens/   the loglens binary (kept thin)
+internal/      parsing, statistics, reporting, follow mode
+scripts/       gen_logs.py
+data/          generated test logs (not committed)
 ```
