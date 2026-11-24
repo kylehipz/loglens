@@ -3,8 +3,10 @@
 FILE ?= sample.log
 LINE_COUNT ?= 100
 
+ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+
 run: build
-	@./bin/loglens
+	@./bin/loglens $(ARGS)
 
 build:
 	@echo "Building loglens binary...."
@@ -22,3 +24,6 @@ clean:
 gen-logs:
 	@mkdir -p data
 	@python3 scripts/gen_logs.py $(LINE_COUNT) > data/$(FILE)
+
+%:
+	@:
