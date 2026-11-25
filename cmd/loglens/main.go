@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"time"
 )
 
 func main() {
@@ -17,8 +16,6 @@ func main() {
 func run(args []string, stdout, stderr io.Writer) int {
 	var format, logLevel, cpuProfile, memProfile, trace string
 	var top, malformedLinesListed, workers, maxErrors int
-	var followMode bool
-	var followInterval time.Duration
 
 	fs := flag.NewFlagSet("loglens", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -39,9 +36,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	// max errors
 	fs.IntVar(&maxErrors, "max-errors", 0, "Stop after N malformed lines")
 
-	// follow
-	fs.BoolVar(&followMode, "follow", false, "Follow mode")
-	fs.DurationVar(&followInterval, "interval", 5*time.Second, "Follow mode: time between reports; atleast 100ms")
 	fs.StringVar(&logLevel, "log-level", "info", "Follow mode: debug, info, warn, or error")
 
 	// profile

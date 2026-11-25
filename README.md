@@ -1,12 +1,11 @@
 # loglens
 
 A command-line tool, written in Go, that analyzes access logs and reports traffic, errors and
-latency. It has a batch mode for one or more files and a follow mode for a single growing log.
+latency over one or more log files.
 
 > **Status:** work in progress. This is a learning project for Go; the behavior below is what the
-> tool is being built to do, as specified in a software requirements specification (SRS v4.0)
-> that is kept out of this repository. Requirement IDs like FR-7 and NFR-4 refer to that
-> document.
+> tool is being built to do, as specified in [`docs/requirements.md`](docs/requirements.md).
+> Requirement IDs like FR-7 and NFR-4 refer to that document.
 
 ## Usage
 
@@ -21,9 +20,6 @@ loglens [flags] FILE...
 | `--errors N` | `5` | Malformed lines listed; `0` lists none (the total is still shown) |
 | `--jobs N` | usable CPUs | Maximum workers; `1` means no concurrent processing |
 | `--max-errors N` | `0` (no limit) | Stop after N malformed lines |
-| `--follow` | off | Follow one growing file |
-| `--interval DURATION` | `5s` | Follow mode: time between reports (at least `100ms`) |
-| `--log-level LEVEL` | `info` | Follow mode: `debug`, `info`, `warn` or `error` |
 | `--cpuprofile FILE` | | Write a CPU profile |
 | `--memprofile FILE` | | Write a heap profile |
 | `--trace FILE` | | Write an execution trace |
@@ -34,10 +30,9 @@ Examples:
 ```sh
 loglens data/access.log                         # text report
 loglens --format json --top 5 data/big-*.log    # one combined JSON report over several files
-loglens --follow --interval 1s data/live.log    # a report every second until Ctrl-C
 ```
 
-Reports go to stdout; errors, warnings and follow-mode logs go to stderr.
+Reports go to stdout; errors and warnings go to stderr.
 
 ## Input format
 
@@ -107,24 +102,18 @@ malformed lines (224 total, first 5)
 - Top IPs are ordered by count, then address; slowest endpoints by average latency, then path.
 - With `--format json` the same report is one JSON object with the keys `files`, `lines`,
   `parsed`, `failed`, `status_classes`, `latency_ms`, `top_ips`, `slowest_endpoints` and
-  `malformed`. In follow mode, each report is one compact JSON object per line.
+  `malformed`.
 - Output is identical for the same input, whatever `--jobs` is.
-
-## Follow mode
-
-`loglens --follow FILE` starts at the current end of the file and writes a report covering every
-line since it started, every `--interval`. If the file is truncated it logs a warning and reads
-from the start again. Ctrl-C (or SIGTERM) writes a final report and exits.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| 0 | Success, including runs with malformed lines; follow mode stopped by a signal |
+| 0 | Success, including runs with malformed lines |
 | 1 | A file couldn't be read, a line exceeded 1 MiB, output couldn't be written, or `--max-errors` was reached |
 | 2 | Usage error |
-| 130 | Batch mode interrupted by SIGINT |
-| 143 | Batch mode terminated by SIGTERM |
+| 130 | Interrupted by SIGINT |
+| 143 | Terminated by SIGTERM |
 
 ## Development
 
@@ -148,7 +137,6 @@ are malformed.
 python3 scripts/gen_logs.py 20000 > data/access.log                                     # D1
 for n in 1 2 3 4 5; do python3 scripts/gen_logs.py 1000000 > data/big-$n.log; done     # D2, ~58 MB each
 python3 scripts/gen_logs.py 5000000 > data/huge.log                                     # D3, ~290 MB
-python3 scripts/gen_logs.py 0 --rate 1000 >> data/live.log                              # D4, endless
 ```
 
 `data/` is not committed.
@@ -163,7 +151,7 @@ Measurements are recorded in `NOTES.md`.
 
 ```
 cmd/loglens/   the loglens binary (kept thin)
-internal/      parsing, statistics, reporting, follow mode
+internal/      parsing, statistics, reporting
 scripts/       gen_logs.py
 data/          generated test logs (not committed)
 ```

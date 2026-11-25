@@ -1,10 +1,14 @@
 # loglens
 
-A Go CLI that analyzes access logs (batch mode over files, follow mode over one growing file) and
-reports traffic, errors and latency. Kyle is building it **to learn Go**.
+A Go CLI that analyzes access log files and reports traffic, errors and latency. Kyle is building
+it **to learn Go**. Follow mode (tailing a growing file) was removed from scope on 2026-11-25.
 
-The requirements live in `loglens-srs.pdf` (SRS v4.0). It is the source of truth; the summary
-below is only an index for reviews. If the two disagree, the PDF wins.
+The requirements live in `docs/requirements.md` (SRS v4.0 plus project notes). It is the source
+of truth; the summary below is only an index for reviews. If the two disagree,
+`docs/requirements.md` wins.
+
+`loglens-srs.pdf` (gitignored) is a copy rendered from `docs/requirements.md`. Change the
+requirements by editing the Markdown, then regenerate the PDF; never edit the PDF on its own.
 
 ## Roles: Kyle codes, Claude reviews
 
@@ -20,6 +24,28 @@ below is only an index for reviews. If the two disagree, the PDF wins.
   writing the solution.
 - This is light mode: no `/spec`, `/drive`, `/ship`, Acceptance sections or ticket files. Don't
   use skills that write code.
+
+## Build order: naive first
+
+Kyle builds a "just works" version first and then meets the requirements about how the tool
+works one at a time. He wants to see the inefficiency himself before fixing it.
+
+- **Allowed in the naive phase**: reading a whole file into memory instead of streaming it,
+  storing every value and sorting it, extra allocations, no concurrency. That means FR-2's
+  streaming and 1 MiB line-limit rules are deferred, along with every NFR.
+- **Not deferred**: what the output says. The counts, percentiles, orderings, messages, exit codes
+  and stdout/stderr split must already match the SRS, because the optimized version has to produce
+  byte-identical output (NFR-11).
+- **In reviews**: don't report deferred choices as bugs. If one will make a later requirement
+  harder, mention it in a short "for later" list. Still report anything that makes the output
+  wrong, even if a naive technique caused it (for example, `strings.Split` adding an empty last
+  line).
+- **High-value learning: NFR-1 to NFR-5, NFR-8, NFR-9** (throughput, scaling, allocations,
+  memory, cancellation). When one of these is the session goal, go deeper in reviews: explain the
+  mechanism (where the allocations come from, why it does or doesn't scale, what the profile
+  shows), run read-only measurements (`go test -bench . -benchmem`, `hyperfine`,
+  `/usr/bin/time -l`, pprof), and compare against the naive baseline in `NOTES.md`. Still explain
+  rather than hand over solutions. In "for later" lists, put items that affect these NFRs first.
 
 ## How to review
 
@@ -51,7 +77,7 @@ below is only an index for reviews. If the two disagree, the PDF wins.
   with staticcheck analyses, golangci-lint lints on save, and goimports + gofumpt format on save
   (gofumpt output is gofmt-clean).
 
-## Spec index (details in the PDF)
+## Spec index (details in `docs/requirements.md`)
 
 **Input (§2).** Six whitespace-separated fields: `timestamp method path status latency"ms" ip`.
 Checked left to right; the first broken rule decides the error kind. Kinds and messages (§4):
@@ -78,20 +104,21 @@ DELETE HEAD OPTIONS, case-sensitive), `invalid status "<tok>"` (digits only, 100
 | FR-14 | Several files → one combined report |
 | FR-15 | Unreadable file: report the rest, exit 1. Write failure: exit 1 |
 | FR-16 | `--max-errors N`: stop everything, no report, exit 1 |
-| FR-17 | Batch SIGINT/SIGTERM: no report, `interrupted`, exit 130/143 |
-| FR-18..23 | Follow mode: start at EOF, hold partial lines, periodic reports, truncation, shutdown, slog-style logs |
+| FR-17 | SIGINT/SIGTERM: no report, `interrupted`, exit 130/143 |
+| FR-18..23 | Removed (follow mode) |
 | FR-24 | `--cpuprofile`, `--memprofile`, `--trace` |
 
 **Non-functional requirements.** NFR-1 throughput (`--jobs 1`), NFR-2/3 scaling across and within
-files, NFR-4 ≤ 1 alloc/line, NFR-5/6 bounded memory, NFR-7 idle CPU, NFR-8/9/10 cancellation
-latency, NFR-11 byte-identical output for any `--jobs`, NFR-12 no panics (fuzz), NFR-13 race-free,
+files, NFR-4 ≤ 1 alloc/line, NFR-5 bounded memory, NFR-6/7 removed, NFR-8/9 cancellation
+latency, NFR-10 removed, NFR-11 byte-identical output for any `--jobs`, NFR-12 no panics (fuzz),
+NFR-13 race-free,
 NFR-14 no leaked goroutines, NFR-15 gofmt/vet/staticcheck, NFR-16 ≥ 80% coverage outside `main`,
 NFR-17 error kinds testable without string matching, NFR-18 doc comments on exports, NFR-19
 platforms and container-aware default `--jobs`.
 
-**Exit codes.** 0 success (incl. malformed lines; follow mode stopped by signal), 1 runtime
-failure, 2 usage, 130 SIGINT, 143 SIGTERM (batch).
+**Exit codes.** 0 success (incl. malformed lines), 1 runtime failure, 2 usage, 130 SIGINT,
+143 SIGTERM.
 
 **Test data.** `gen_logs.py` (SRS Appendix A) makes data sets D1 (`data/access.log`, 20k lines),
-D2 (`data/big-1..5.log`, 1M each), D3 (`data/huge.log`, 5M), D4 (`data/live.log`, growing).
+D2 (`data/big-1..5.log`, 1M each), D3 (`data/huge.log`, 5M).
 Measurements go in `NOTES.md` (§7): command, raw numbers, median of five, Go version, machine.

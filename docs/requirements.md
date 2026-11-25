@@ -2,11 +2,25 @@
 
 Version 4.0 · 22 November 2026
 
-> Transcribed from [`loglens-srs.pdf`](../loglens-srs.pdf). The PDF is the source of truth; if
-> this file and the PDF disagree, the PDF wins.
+> This file is the source of truth for loglens's requirements. It began as a transcription of the
+> SRS v4.0 PDF; [`loglens-srs.pdf`](../loglens-srs.pdf) is now rendered from this file. Edit
+> this file, not the PDF.
+
+> **Project note: build order.** loglens is built naive-first. The first
+> version only has to produce correct output: whole-file reads, brute-force statistics and no
+> concurrency are fine. FR-2's streaming and 1 MiB line-limit rules, and all of section 5, are met
+> afterwards, one at a time. The output (counts, percentiles, orderings, messages, exit codes) must
+> already match this spec in the first version. The finished tool must meet every requirement
+> below. The efficiency requirements in sections 5.1–5.3 (NFR-1 to NFR-5, NFR-8 and NFR-9) are
+> the project's high-value learning goals; the naive version's measurements are the baseline
+> they're compared against.
+
+> **Changes from the original v4.0.** Follow mode was removed to reduce scope (25 November 2026):
+> FR-18 to FR-23, NFR-6, NFR-7, NFR-10, data set D4, and the `--follow`, `--interval` and
+> `--log-level` flags. Removed IDs are kept as gaps and not reused.
 
 **Product.** A command-line tool, written in Go, that analyzes access logs and reports traffic,
-errors and latency. It has a batch mode for files and a follow mode for a growing log.
+errors and latency over one or more log files.
 
 **This document.** What the tool must do (functional requirements, FR) and how well it must do it
 (non-functional requirements, NFR), each with acceptance criteria. Design and implementation are
@@ -26,12 +40,10 @@ deliberately left open.
 ### Scope
 
 **In scope:** analyzing one or more log files in the format of section 2; text and JSON reports;
-concurrent processing controlled by the user; following a single growing file; built-in profiling
-output.
+concurrent processing controlled by the user; built-in profiling output.
 
-**Out of scope:** other log formats, compressed input, reading from stdin or the network,
-following several files, following a file that is replaced by rename-based rotation, persistent
-storage, and Windows support.
+**Out of scope:** following a growing file (follow mode) in any form, other log formats,
+compressed input, reading from stdin or the network, persistent storage, and Windows support.
 
 ### Definitions
 
@@ -40,7 +52,7 @@ storage, and Windows support.
 | Line | A sequence of bytes ended by `\n`, or by end of file for the last line. |
 | Parsed line | A line that satisfies every rule in section 2. |
 | Malformed line | A line that breaks at least one rule. It is counted and reported, never fatal. |
-| Report | The statistics for every line processed in one run (batch mode) or since start (follow mode). |
+| Report | The statistics for every line processed in one run. |
 | Worker | A unit of concurrent processing. `--jobs` sets the maximum number. |
 | Reference machine | An Apple M4 Pro MacBook Pro on AC power. Performance targets in section 5 are stated for it. |
 
@@ -53,7 +65,6 @@ All data comes from `gen_logs.py` (Appendix A), which makes about 1% of lines ma
 | D1 | 20,000 lines | `python3 gen_logs.py 20000 > data/access.log` |
 | D2 | Five files of 1,000,000 lines (~58 MB each) | `python3 gen_logs.py 1000000 > data/big-N.log`, for N = 1..5 |
 | D3 | One file of 5,000,000 lines (~290 MB) | `python3 gen_logs.py 5000000 > data/huge.log` |
-| D4 | A live file growing at about 1,000 lines/s | `python3 gen_logs.py 0 --rate 1000 >> data/live.log` |
 
 ## 2. Input format
 
@@ -100,9 +111,6 @@ before file arguments; accepting flags after files is optional.
 | `--errors N` | 5 | Malformed lines listed; 0 lists none (the total is still shown) |
 | `--jobs N` | usable CPUs | Maximum workers; 1 means no concurrent processing |
 | `--max-errors N` | 0 (no limit) | Stop after N malformed lines (FR-16) |
-| `--follow` | off | Follow mode (FR-18 to FR-23) |
-| `--interval DURATION` | 5s | Follow mode: time between reports; at least 100ms |
-| `--log-level LEVEL` | `info` | Follow mode: `debug`, `info`, `warn` or `error` |
 | `--cpuprofile FILE` | | Write a CPU profile (FR-24) |
 | `--memprofile FILE` | | Write a heap profile (FR-24) |
 | `--trace FILE` | | Write an execution trace (FR-24) |
@@ -111,8 +119,8 @@ before file arguments; accepting flags after files is optional.
 Acceptance
 
 - [ ] `loglens -h` lists every flag and exits with 0.
-- [ ] An unknown flag, an invalid value (for example `--jobs 0`, `--format xml`, `--top -1`,
-  `--interval 10ms`) or no file arguments prints a usage message on stderr and exits with 2.
+- [ ] An unknown flag, an invalid value (for example `--jobs 0`, `--format xml`, `--top -1`) or
+  no file arguments prints a usage message on stderr and exits with 2.
 
 #### FR-2 · Reading files
 
@@ -216,7 +224,7 @@ Acceptance
 
 #### FR-11 · Output streams
 
-Reports go to stdout. Error messages, warnings and operational logs go to stderr.
+Reports go to stdout. Error messages and warnings go to stderr.
 
 #### FR-12 · Text report
 
@@ -270,84 +278,25 @@ Acceptance
 
 - [ ] `loglens --max-errors 10` on D2 exits with 1 and prints nothing to stdout.
 
-#### FR-17 · Interruption in batch mode
+#### FR-17 · Interruption
 
-On SIGINT or SIGTERM during batch analysis, the tool stops processing, prints no report, writes
+On SIGINT or SIGTERM during analysis, the tool stops processing, prints no report, writes
 `interrupted` to stderr, and exits with 130 (SIGINT) or 143 (SIGTERM).
 
 Acceptance
 
 - [ ] Pressing Ctrl-C during a run over D2 exits with 130; `kill -TERM` exits with 143.
 
-### 3.6 Follow mode
+### 3.6 Follow mode (removed)
 
-#### FR-18 · Starting
-
-`loglens --follow FILE` follows exactly one file. Any other number of files is a usage error.
-Following starts at the file's current end; existing content is not analyzed.
-
-Acceptance
-
-- [ ] Starting on a non-empty file reports zero lines until new lines are appended.
-- [ ] `loglens --follow a.log b.log` exits with 2.
-
-#### FR-19 · Reading appended data
-
-Lines appended to the file are parsed and added to the statistics. A final line without a trailing
-newline is held until it is completed.
-
-Acceptance
-
-- [ ] Appending `...10.0.0.1` and then, later, `\n` produces exactly one parsed line.
-
-#### FR-20 · Periodic reports
-
-Every `--interval`, the tool writes a report covering every line since it started, in the chosen
-format. Text reports are separated by a line `--- <time in RFC 3339> ---`. JSON reports are written
-one compact object per line.
-
-Acceptance
-
-- [ ] With D4 running, a report appears every interval and its counts grow.
-- [ ] `loglens --follow --format json data/live.log | jq -c .lines` prints one number per report.
-
-#### FR-21 · Truncation
-
-If the file becomes shorter than the position already read (for example `: > data/live.log`), the
-tool logs a warning and continues reading from the start of the file. Statistics keep
-accumulating.
-
-Acceptance
-
-- [ ] Truncating the file during D4 logs one warning, and later reports keep counting new lines.
-
-#### FR-22 · Stopping
-
-On SIGINT or SIGTERM the tool writes a final report and exits with 0. If the file can no longer be
-read, it logs an error, writes a final report and exits with 1.
-
-Acceptance
-
-- [ ] Ctrl-C prints a final report and exits with 0.
-- [ ] Deleting the followed file leads to an error log, a final report and exit code 1.
-
-#### FR-23 · Operational log
-
-In follow mode the tool writes structured log records (key=value pairs or JSON objects, one per
-line) to stderr, filtered by `--log-level`. At least: start (file and interval) at info, truncation
-at warn, read errors at error, and shutdown at info.
-
-Acceptance
-
-- [ ] `--log-level error` hides the start and shutdown records; `--log-level debug` shows them.
+FR-18 to FR-23 covered follow mode, which is out of scope. The IDs are not reused.
 
 ### 3.7 Diagnostics
 
 #### FR-24 · Profiles and traces
 
 `--cpuprofile FILE` writes a CPU profile of the run, `--memprofile FILE` writes a heap profile
-taken at the end of the run, and `--trace FILE` writes a Go execution trace. They work in batch and
-follow mode.
+taken at the end of the run, and `--trace FILE` writes a Go execution trace.
 
 Acceptance
 
@@ -424,11 +373,11 @@ In reports, each message is prefixed with `file:line: `.
 
 | Code | Meaning |
 |---|---|
-| 0 | Success, including runs with malformed lines. Follow mode stopped by a signal. |
+| 0 | Success, including runs with malformed lines. |
 | 1 | Runtime failure: a file couldn't be read, a line exceeded 1 MiB, output couldn't be written, or `--max-errors` was reached. |
 | 2 | Usage error. |
-| 130 | Batch mode interrupted by SIGINT. |
-| 143 | Batch mode terminated by SIGTERM. |
+| 130 | Interrupted by SIGINT. |
+| 143 | Terminated by SIGTERM. |
 
 ## 5. Non-functional requirements
 
@@ -480,7 +429,7 @@ Acceptance
 
 ### 5.2 Resource usage
 
-#### NFR-5 · Bounded memory in batch mode
+#### NFR-5 · Bounded memory
 
 Peak memory does not grow with the number of lines or the size of the files; it may grow with the
 number of distinct IP addresses, paths and latency values. For any `--jobs` from 1 to 16, peak
@@ -491,26 +440,11 @@ Acceptance
 
 - [ ] Peak RSS for `data/big-1.log` and for D2 meet both limits at `--jobs` 1, 8 and 16.
 
-#### NFR-6 · Bounded memory in follow mode
-
-Following D4 for 60 minutes, resident memory at 60 minutes is within 10% of resident memory at
-5 minutes.
-
-Acceptance
-
-- [ ] Sampled RSS (for example with `ps -o rss`) at 5 and 60 minutes meets the limit.
-
-#### NFR-7 · Idle cost in follow mode
-
-When no data is being appended, the tool uses on average at most 1% of one CPU core.
-
-Acceptance
-
-- [ ] Average CPU over 60 idle seconds, measured with `ps` or `top`, is at most 1%.
+NFR-6 and NFR-7 covered follow mode, which is out of scope. The IDs are not reused.
 
 ### 5.3 Responsiveness
 
-#### NFR-8 · Batch cancellation
+#### NFR-8 · Cancellation
 
 After SIGINT or SIGTERM, the process exits within 500 ms, at any `--jobs` value.
 
@@ -527,17 +461,7 @@ Acceptance
 
 - [ ] `loglens --max-errors 10 --jobs 8 data/big-*.log` completes in under 500 ms.
 
-#### NFR-10 · Follow mode freshness and shutdown
-
-A complete line appended to the followed file is included in every report written at least one
-second after it was appended. After SIGINT or SIGTERM, the final report is written and the process
-exits within one second.
-
-Acceptance
-
-- [ ] With `--interval 1s`, a line appended by hand appears in the second report after it at the
-  latest.
-- [ ] Ctrl-C to exit takes under one second.
+NFR-10 covered follow mode, which is out of scope. The ID is not reused.
 
 ### 5.4 Correctness and reliability
 
@@ -656,14 +580,11 @@ the median, the Go version and the machine. Re-measure after changes that could 
 
 ## Appendix A · Test data generator
 
-Save as `gen_logs.py` (also provided as a separate file). It needs only Python 3. In this
-repository it lives at [`scripts/gen_logs.py`](../scripts/gen_logs.py); that file matches the
-source printed in the PDF.
+The generator is [`scripts/gen_logs.py`](../scripts/gen_logs.py). It needs only Python 3.
 
 ```sh
-python3 gen_logs.py 20000 > data/access.log          # fixed number of lines
-python3 gen_logs.py 1000000 > data/big-1.log         # ~58 MB
-python3 gen_logs.py 0 --rate 1000 >> data/live.log   # endless, ~1,000 lines/sec
+python3 gen_logs.py 20000 > data/access.log     # fixed number of lines
+python3 gen_logs.py 1000000 > data/big-1.log    # ~58 MB
 ```
 
 ### Malformed lines it produces
