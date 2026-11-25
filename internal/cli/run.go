@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+
+	"github.com/kylehipz/loglens/internal/parse"
 )
 
 // Run executes loglens with the given command-line arguments, which exclude the
@@ -48,7 +50,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	if len(fs.Args()) == 0 {
+	args = fs.Args()
+
+	if len(args) == 0 {
 		fs.Usage()
 		return 2
 	}
@@ -60,5 +64,6 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	parse.ReadFiles(args)
 	return 0
 }
