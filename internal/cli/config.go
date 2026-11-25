@@ -10,28 +10,12 @@ type LogLensConfig struct {
 	Top, Errors, Workers, MaxErrors       int
 }
 
-func newLogLensConfig(
-	format, cpuProfile, memProfile, trace string,
-	top, errs, workers, maxErrors int,
-) *LogLensConfig {
-	return &LogLensConfig{
-		Format:     format,
-		CPUProfile: cpuProfile,
-		MemProfile: memProfile,
-		Trace:      trace,
-		Top:        top,
-		Errors:     errs,
-		Workers:    workers,
-		MaxErrors:  maxErrors,
-	}
-}
-
 func (c LogLensConfig) validate() error {
 	// format
 	validFormats := []string{"text", "json"}
 
 	if !slices.Contains(validFormats, c.Format) {
-		return fmt.Errorf("invalid value %d for --format: must be in: text, json", c.Format)
+		return fmt.Errorf("invalid value %s for --format: must be in: text, json", c.Format)
 	}
 
 	// top
