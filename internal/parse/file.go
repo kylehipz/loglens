@@ -17,7 +17,7 @@ func ReadFiles(files []string) {
 		content := strings.TrimSpace(string(data))
 
 		for line := range strings.SplitSeq(content, "\n") {
-			fmt.Println(line)
+			parseLine(line)
 		}
 	}
 }
