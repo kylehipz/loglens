@@ -5,17 +5,17 @@ import (
 	"slices"
 )
 
-type LogLensConfig struct {
+type logLensConfig struct {
 	Format, CPUProfile, MemProfile, Trace string
 	Top, Errors, Workers, MaxErrors       int
 }
 
-func (c LogLensConfig) validate() error {
+func (c logLensConfig) validate() error {
 	// format
 	validFormats := []string{"text", "json"}
 
 	if !slices.Contains(validFormats, c.Format) {
-		return fmt.Errorf("invalid value %s for --format: must be in: text, json", c.Format)
+		return fmt.Errorf("invalid value %q for --format: must be in: text, json", c.Format)
 	}
 
 	// top
@@ -35,7 +35,7 @@ func (c LogLensConfig) validate() error {
 
 	// max errors
 	if c.MaxErrors < 0 {
-		return fmt.Errorf("invalid value %d for --maxErrors: must be >= 0", c.MaxErrors)
+		return fmt.Errorf("invalid value %d for --max-errors: must be >= 0", c.MaxErrors)
 	}
 
 	return nil
